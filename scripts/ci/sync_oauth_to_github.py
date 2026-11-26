@@ -45,8 +45,8 @@ except ImportError:
     print("Run: pip install pynacl")
     sys.exit(1)
 
-OWNER = "ruchimuskan"
-REPO = "youtube-Muskathya"
+OWNER = "parchhaikiskithi"
+REPO = "youtube-parchhai"
 
 
 def put_secret(client: httpx.Client, headers: dict, name: str, value: str) -> None:

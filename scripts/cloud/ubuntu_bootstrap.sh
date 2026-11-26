@@ -19,7 +19,7 @@ python -m app.main init-db
 echo ""
 echo "Next (one time on this VPS):"
 echo "  1. Copy .env, client_secrets.json, data/oauth_tokens.json from your Mac to $ROOT"
-echo "  2. Install GitHub Actions runner: https://github.com/ruchimuskan/youtube-Muskathya/settings/actions/runners/new"
+echo "  2. Install GitHub Actions runner: https://github.com/parchhaikiskithi/youtube-parchhai/settings/actions/runners/new"
 echo "     Labels MUST include: self-hosted, youtube-ai"
 echo "  3. sudo ./svc.sh install && sudo ./svc.sh start  (inside runner folder)"
 echo "  4. bash scripts/preflight_automation.sh"

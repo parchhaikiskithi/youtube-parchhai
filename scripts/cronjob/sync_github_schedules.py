@@ -6,7 +6,7 @@ Requires env:
   GH_DISPATCH_PAT — GitHub PAT (classic) with `repo` scope for dispatch API
 
 Optional:
-  GITHUB_REPOSITORY — owner/repo (default from git or ruchimuskan/youtube-Muskathya)
+  GITHUB_REPOSITORY — owner/repo (default from git or parchhaikiskithi/youtube-parchhai)
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import httpx
 CRON_API = "https://api.cron-job.org"
 POST_METHOD = 1
 
-DEFAULT_REPO = "ruchimuskan/youtube-Muskathya"
+DEFAULT_REPO = "parchhaikiskithi/youtube-parchhai"
 
 
 def _repo_slug() -> str:
@@ -57,7 +57,7 @@ def _dispatch_jobs(repo: str, pat: str) -> list[dict[str, Any]]:
     }
     return [
         {
-            "title": "Muskathya — 3PM IST video + YouTube upload",
+            "title": "Parchhai — 3PM IST video + YouTube upload",
             "url": url,
             "event_type": "daily_pipeline",
             "schedule": {
@@ -75,7 +75,7 @@ def _dispatch_jobs(repo: str, pat: str) -> list[dict[str, Any]]:
             },
         },
         {
-            "title": "Muskathya — 6PM IST deferred upload queue",
+            "title": "Parchhai — 6PM IST deferred upload queue",
             "url": url,
             "event_type": "upload_queue",
             "schedule": {

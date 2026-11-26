@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, update
 from sqlalchemy.orm import Session
 
 from app.database.models import (
@@ -31,6 +31,9 @@ class Repository:
 
     # Channel
     def save_channel(self, channel_id: str, channel_title: str) -> ChannelConnection:
+        self.session.execute(
+            update(ChannelConnection).where(ChannelConnection.channel_id != channel_id).values(is_active=False)
+        )
         existing = self.session.scalar(
             select(ChannelConnection).where(ChannelConnection.channel_id == channel_id)
         )
@@ -38,14 +41,17 @@ class Repository:
             existing.channel_title = channel_title
             existing.is_active = True
             return existing
-        row = ChannelConnection(channel_id=channel_id, channel_title=channel_title)
+        row = ChannelConnection(channel_id=channel_id, channel_title=channel_title, is_active=True)
         self.session.add(row)
         self.session.flush()
         return row
 
     def get_active_channel(self) -> ChannelConnection | None:
         return self.session.scalar(
-            select(ChannelConnection).where(ChannelConnection.is_active.is_(True)).limit(1)
+            select(ChannelConnection)
+            .where(ChannelConnection.is_active.is_(True))
+            .order_by(desc(ChannelConnection.connected_at))
+            .limit(1)
         )
 
     # Stories & videos

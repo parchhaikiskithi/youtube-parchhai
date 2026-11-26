@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LABEL_PREFIX="com.youtube.muskathya"
+LABEL_PREFIX="com.youtube.parchhaikiskithi"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 
 chmod +x "$ROOT/scripts/run_daily_automation.sh" "$ROOT/scripts/run_upload_queue.sh" "$ROOT/scripts/preflight_automation.sh"

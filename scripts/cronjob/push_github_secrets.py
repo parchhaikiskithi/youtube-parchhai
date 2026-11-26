@@ -21,8 +21,8 @@ except ImportError:
     print("pip install pynacl")
     sys.exit(1)
 
-OWNER = "ruchimuskan"
-REPO = "youtube-Muskathya"
+OWNER = "parchhaikiskithi"
+REPO = "youtube-parchhai"
 
 
 def encrypt_secret(public_key: str, secret_value: str) -> str:
