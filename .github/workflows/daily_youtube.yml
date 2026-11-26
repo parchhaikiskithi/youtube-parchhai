@@ -1,0 +1,82 @@
+name: Daily YouTube (IST)
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_now:
+        description: "Upload to YouTube (scheduled for 9 PM IST)"
+        type: boolean
+        default: true
+        required: false
+  repository_dispatch:
+    types: [daily_pipeline, upload_queue]
+  schedule:
+    # 1:00 PM IST is 07:30 UTC
+    - cron: '30 7 * * *'
+    # 9:00 PM IST is 15:30 UTC
+    - cron: '30 15 * * *'
+
+concurrency:
+  group: youtube-pipeline
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install System Dependencies & Piper TTS
+        run: |
+          bash scripts/ci/install_cloud_deps.sh
+
+      - name: Install Python Requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Materialize OAuth Secrets
+        env:
+          GOOGLE_CLIENT_SECRETS_JSON: ${{ secrets.GOOGLE_CLIENT_SECRETS_JSON }}
+          YOUTUBE_OAUTH_TOKENS_JSON: ${{ secrets.YOUTUBE_OAUTH_TOKENS_JSON }}
+        run: |
+          bash scripts/ci/materialize_oauth.sh
+
+      - name: Run Daily Video Pipeline (Generate & Schedule for 9 PM)
+        if: github.event.action == 'daily_pipeline' || (github.event_name == 'workflow_dispatch' && inputs.upload_now != false) || (github.event_name == 'schedule' && github.event.schedule == '30 7 * * *')
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER || 'cloudflare' }}
+          PIPELINE_DAILY_RUN_HOUR: 13
+          PIPELINE_DAILY_RUN_MINUTE: 0
+          PUBLISH_HOUR: 21
+          PUBLISH_MINUTE: 0
+        run: |
+          python -m app.main init-db
+          KEY="daily-$(date +%Y-%m-%d)"
+          python -m app.main generate --upload --idempotency-key "$KEY"
+
+      - name: Run Upload Queue (9 PM Publish / Process Deferred)
+        if: github.event.action == 'upload_queue' || (github.event_name == 'schedule' && github.event.schedule == '30 15 * * *')
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PIPELINE_DAILY_RUN_HOUR: 13
+          PUBLISH_HOUR: 21
+        run: |
+          python -m app.main upload-queue
+
+      - name: Sync Updated OAuth Tokens
+        if: always()
+        env:
+          GITHUB_ADMIN_PAT: ${{ secrets.GH_DISPATCH_PAT }}
+        run: |
+          python scripts/ci/sync_oauth_to_github.py || echo "OAuth sync skipped"
