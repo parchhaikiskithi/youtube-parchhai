@@ -6,18 +6,26 @@ from typing import Any
 
 import httpx
 try:
-    from tenacity import retry, stop_after_attempt, wait_exponential
+    from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 except ImportError:
     def retry(*args, **kwargs):
         def decorator(func):
             return func
         return decorator
 
+    def retry_if_not_exception_type(*args, **kwargs):
+        return None
+
     def stop_after_attempt(*args, **kwargs):
         return None
 
     def wait_exponential(*args, **kwargs):
         return None
+
+
+class CloudflareQuotaExceeded(RuntimeError):
+    """Raised when daily free allocation or account neurons are exhausted."""
+    pass
 
 from app.ai.providers.base import LLMProvider, LLMResponse
 from app.config import get_settings
@@ -75,6 +83,7 @@ class CloudflareWorkersAI(LLMProvider):
         return bool(self.settings.cloudflare_account_id and self.settings.cloudflare_api_token)
 
     @retry(
+        retry=retry_if_not_exception_type(CloudflareQuotaExceeded),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=5, max=60),
         reraise=True,
@@ -121,11 +130,14 @@ class CloudflareWorkersAI(LLMProvider):
 
                     if resp.status_code == 429:
                         logger.warning(
-                            "Cloudflare model %s returned 429 Too Many Requests: %s. Trying fallback model...",
+                            "Cloudflare model %s returned 429 Too Many Requests: %s.",
                             model,
                             resp.text[:200],
                         )
                         last_error = RuntimeError(f"Rate limited (429) on {model}: {resp.text[:200]}")
+                        if "neurons" in resp.text.lower() or "daily free allocation" in resp.text.lower():
+                            logger.error("Cloudflare daily account quota reached. Immediately failing over.")
+                            raise CloudflareQuotaExceeded(f"Cloudflare daily neuron allocation reached: {resp.text[:200]}")
                         continue
                     if resp.status_code == 410:
                         logger.warning(

@@ -156,14 +156,12 @@ class SegmentSynthesizer:
             str(output_path),
             "--length_scale",
             str(length_scale),
-            "--input_file",
-            str(input_file),
         ]
         config = model.with_suffix(".onnx.json")
         if config.exists():
             cmd.extend(["--config", str(config)])
 
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, input=text, capture_output=True, text=True)
         if proc.returncode != 0:
             raise RuntimeError(f"Piper failed: {proc.stderr}")
         if not output_path.exists():
