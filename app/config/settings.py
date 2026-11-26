@@ -47,9 +47,9 @@ class Settings(BaseSettings):
     max_daily_uploads: int = 1
     privacy_mode: Literal["private", "unlisted", "public"] = "public"
     publishing_mode: Literal["immediate", "schedule"] = "schedule"
-    publish_hour: int = 18
+    publish_hour: int = 21
     publish_minute: int = 0
-    pipeline_daily_run_hour: int = 15
+    pipeline_daily_run_hour: int = 13
     pipeline_daily_run_minute: int = 0
     shorts_ratio: float = 0.0
     automatic_learning: bool = True

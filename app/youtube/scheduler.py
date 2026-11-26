@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PublishScheduler:
-    """Next YouTube publish slot at configured local time (default 6:00 PM)."""
+    """Next YouTube publish slot at configured local time (default 9:00 PM IST)."""
 
     def _slot(self, day_offset: int = 0) -> datetime:
         settings = get_settings()

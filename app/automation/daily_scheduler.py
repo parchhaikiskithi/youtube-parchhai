@@ -37,7 +37,7 @@ def _run_daily_job() -> None:
 
 
 def start_blocking_scheduler() -> None:
-    """Run video generation daily (default 3 PM IST) and schedule YouTube publish at 6 PM."""
+    """Run video generation daily (default 1 PM IST) and schedule YouTube publish at 9 PM IST."""
     settings = get_settings()
     sched = BlockingScheduler(timezone=settings.timezone)
     sched.add_job(

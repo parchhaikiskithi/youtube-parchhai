@@ -57,13 +57,13 @@ def _dispatch_jobs(repo: str, pat: str) -> list[dict[str, Any]]:
     }
     return [
         {
-            "title": "Parchhai — 3PM IST video + YouTube upload",
+            "title": "Parchhai — 1PM IST video generation pipeline",
             "url": url,
             "event_type": "daily_pipeline",
             "schedule": {
                 "timezone": "Asia/Kolkata",
                 "expiresAt": 0,
-                "hours": [15],
+                "hours": [13],
                 "minutes": [0],
                 "mdays": [-1],
                 "months": [-1],
@@ -75,13 +75,13 @@ def _dispatch_jobs(repo: str, pat: str) -> list[dict[str, Any]]:
             },
         },
         {
-            "title": "Parchhai — 6PM IST deferred upload queue",
+            "title": "Parchhai — 9PM IST YouTube upload & publish",
             "url": url,
             "event_type": "upload_queue",
             "schedule": {
                 "timezone": "Asia/Kolkata",
                 "expiresAt": 0,
-                "hours": [18],
+                "hours": [21],
                 "minutes": [0],
                 "mdays": [-1],
                 "months": [-1],

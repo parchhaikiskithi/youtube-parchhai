@@ -58,16 +58,16 @@ EOF
 mkdir -p "$PLIST_DIR" "$ROOT/logs"
 
 # Default times from .env if present
-GEN_H=15
+GEN_H=13
 GEN_M=0
-PUB_H=18
+PUB_H=21
 PUB_M=0
 if [[ -f "$ROOT/.env" ]]; then
   # shellcheck disable=SC1091
   source "$ROOT/.env"
-  GEN_H="${PIPELINE_DAILY_RUN_HOUR:-15}"
+  GEN_H="${PIPELINE_DAILY_RUN_HOUR:-13}"
   GEN_M="${PIPELINE_DAILY_RUN_MINUTE:-0}"
-  PUB_H="${PUBLISH_HOUR:-18}"
+  PUB_H="${PUBLISH_HOUR:-21}"
   PUB_M="${PUBLISH_MINUTE:-0}"
 fi
 
