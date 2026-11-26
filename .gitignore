@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Secrets and OAuth credentials (DO NOT COMMIT)
+.env
+.env.*
+!.env.example
+client_secrets.json
+data/oauth_tokens.json*
+data/oauth_pending/
+*.pem
+*.key
+
+# Local SQLite databases & runtime data
+data/*.db
+data/channel_manager.db
+data/pending_youtube_uploads.json
+data/voice_quality/
+data/tts_debug/
+data/tts_acceptance/
+
+# Generated video outputs & media artifacts
+output/
+logs/*.log
+logs/*.jsonl
+
+# Large binary voice models (downloadable on demand)
+data/voices/*.onnx
+data/voices/*.onnx.json
+
+# Operating System & Editor artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Testing caches
+.pytest_cache/
+.coverage
+htmlcov/

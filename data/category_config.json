@@ -1,0 +1,27 @@
+{
+  "auto_category_selection": true,
+  "manual_category_id": null,
+  "video_format_mode": "long",
+  "narrator_gender_override": null,
+  "visual_style_override": null,
+  "category_weights": {
+    "haunted_haveli": 0.15,
+    "witch_ghost": 0.15,
+    "mysterious_village": 0.15,
+    "locked_room_mystery": 0.10,
+    "missing_person": 0.10,
+    "mysterious_letters": 0.10,
+    "shocking_twist_horror": 0.15,
+    "paranormal_fiction": 0.10
+  },
+  "enabled_categories": [
+    "haunted_haveli",
+    "witch_ghost",
+    "mysterious_village",
+    "locked_room_mystery",
+    "missing_person",
+    "mysterious_letters",
+    "shocking_twist_horror",
+    "paranormal_fiction"
+  ]
+}
