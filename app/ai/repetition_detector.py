@@ -339,21 +339,111 @@ class RepetitionDetector:
                     )
                 )
 
+        # 6. Check Duplicate Image Prompts & Visual Descriptions
+        seen_prompts: dict[str, int] = {}
+        repeated_prompts_count = 0
+        for sc in scenes:
+            sn = sc.get("scene_number", 0)
+            ip = (sc.get("image_prompt") or "").strip().lower()
+            if ip and len(ip) > 25:
+                if ip in seen_prompts:
+                    first_sn = seen_prompts[ip]
+                    repeated_prompts_count += 1
+                    issues.append(
+                        RepetitionIssue(
+                            issue_type="repeated_image_prompt",
+                            scene_number=sn,
+                            text=sc.get("image_prompt", "")[:120],
+                            details=f"Image prompt is identical to Scene {first_sn}",
+                            severity="critical",
+                        )
+                    )
+                else:
+                    seen_prompts[ip] = sn
+
         if duplicate_sentences_count > 0:
             critical_issues.append(f"Found {duplicate_sentences_count} duplicate sentence(s) across scenes")
         if repeated_dialogues_count > 0:
             critical_issues.append(f"Found {repeated_dialogues_count} repeated dialogue line(s) across scenes")
+        if repeated_prompts_count > 0:
+            critical_issues.append(f"Found {repeated_prompts_count} repeated image prompt(s) across scenes")
+
+        # 7. Check Repeated 3-4 word phrases (Crutch Phrases)
+        phrase_tracker: dict[str, list[int]] = {}
+        for sc in scenes:
+            sn = sc.get("scene_number", 0)
+            narr = (sc.get("narration") or "").strip()
+            if narr:
+                for sent in self.split_into_sentences(narr):
+                    words = [w for w in re.findall(r"[\u0900-\u097F]+", sent) if len(w) > 1]
+                    for n in (3, 4):
+                        for idx in range(len(words) - n + 1):
+                            p = " ".join(words[idx : idx + n])
+                            if any(k in p for k in ("होता जा रहा", "होती जा रही", "कर दिया था", "जा रहा था", "गया था", "और उसने अपने", "और उसने", "ने अपने", "उसने अपने")):
+                                continue
+                            phrase_tracker.setdefault(p, []).append(sn)
+
+        repeated_phrases_count = 0
+        for p, sns in phrase_tracker.items():
+            unique_scenes = set(sns)
+            if len(unique_scenes) >= 3:
+                repeated_phrases_count += 1
+                issues.append(
+                    RepetitionIssue(
+                        issue_type="repeated_phrase",
+                        scene_number=sns[1],
+                        text=p,
+                        details=f"Phrase '{p}' repeated across {len(unique_scenes)} scenes: {sorted(list(unique_scenes))}",
+                        severity="critical" if len(unique_scenes) >= 4 else "warning",
+                    )
+                )
+                if len(unique_scenes) >= 4:
+                    critical_issues.append(f"Crutch phrase '{p}' repeated across {len(unique_scenes)} scenes")
+
+        # 8. Check Excessive Word Repetition within a Single Scene
+        stopwords = {
+            "और", "था", "थी", "थे", "है", "हैं", "के", "की", "का", "को", "में", "से", "पर", "ने", "एक",
+            "कि", "भी", "तो", "ही", "हो", "कर", "रहा", "रही", "रहे", "गया", "गई", "गए", "लिया", "दिया",
+            "हुए", "हुआ", "हुई", "जो", "वह", "उसके", "उसकी", "उसके", "उसने", "उसे", "अपने", "अपनी", "अपना",
+            "यहाँ", "वहाँ", "अब", "जब", "तब", "कुछ", "कोई", "क्या", "कौन", "तक"
+        }
+        for sc in scenes:
+            sn = sc.get("scene_number", 0)
+            narr = (sc.get("narration") or "").strip()
+            if narr:
+                words = [w for w in re.findall(r"[\u0900-\u097F]+", narr) if len(w) >= 3]
+                content_words = [w for w in words if w not in stopwords]
+                word_counts = {}
+                for w in content_words:
+                    word_counts[w] = word_counts.get(w, 0) + 1
+                for w, cnt in word_counts.items():
+                    if any(c.get("name") == w for c in story.get("characters", [])):
+                        continue
+                    if cnt >= 3:
+                        issues.append(
+                            RepetitionIssue(
+                                issue_type="repetitive_word",
+                                scene_number=sn,
+                                text=w,
+                                details=f"Word '{w}' repeated {cnt} times within Scene {sn} narration",
+                                severity="critical" if cnt >= 4 else "warning",
+                            )
+                        )
 
         # Calculate penalty score
         penalty = 0
-        penalty += duplicate_sentences_count * 4
-        penalty += repeated_dialogues_count * 3
+        penalty += duplicate_sentences_count * 5
+        penalty += repeated_dialogues_count * 4
+        penalty += repeated_prompts_count * 5
         penalty += semantic_repeats_count * 2
+        penalty += repeated_phrases_count * 2
         for iss in issues:
             if iss.issue_type == "repeated_paragraph":
-                penalty += 5
+                penalty += 6
             elif iss.issue_type == "generic_dialogue":
                 penalty += 1
+            elif iss.issue_type == "repetitive_word" and iss.severity == "critical":
+                penalty += 3
 
         penalty = min(penalty, 30)
         has_rep = len(issues) > 0
@@ -422,5 +512,73 @@ class RepetitionDetector:
                     seen_dialogues.add(norm)
                 new_dialogue.append(d)
             sc["dialogue"] = new_dialogue
+
+        # Clean duplicate image prompts and visual descriptions across scenes
+        seen_prompts: set[str] = set()
+        seen_visuals: set[str] = set()
+        for sc in scenes:
+            sn = sc.get("scene_number", 0)
+            ip = (sc.get("image_prompt") or "").strip()
+            vd = (sc.get("visual_description") or "").strip()
+            narr_snippet = (sc.get("narration") or "")[:60].replace('"', "'").strip()
+
+            if ip:
+                norm_ip = ip.lower()
+                if norm_ip in seen_prompts:
+                    new_ip = f"{ip}, distinct Scene {sn} dramatic perspective, focused on: {narr_snippet or 'immediate action'}"
+                    logger.info("Scene %s: Differentiating duplicate image prompt", sn)
+                    sc["image_prompt"] = new_ip
+                else:
+                    seen_prompts.add(norm_ip)
+
+            if vd:
+                norm_vd = vd.lower()
+                if norm_vd in seen_visuals:
+                    new_vd = f"{vd} (सीन {sn}: नया कैमरा एंगल व विवरण)"
+                    logger.info("Scene %s: Differentiating duplicate visual description", sn)
+                    sc["visual_description"] = new_vd
+                else:
+                    seen_visuals.add(norm_vd)
+
+        # Diversify repetitive crutch phrases across narrations
+        crutch_phrases = {
+            r"को लगता है कि": [
+                "को आभास हुआ कि",
+                "ने महसूस किया कि",
+                "के मन में शंका उभरी कि",
+                "को यकीन हो चला था कि",
+            ],
+            r"खड़ा होता है": [
+                "ठिठक जाता है",
+                "कदम रोक लेता है",
+                "सन्नाटे में जम जाता है",
+            ],
+            r"देखता है कि": [
+                "की नज़र पड़ती है कि",
+                "ने गौर से देखा कि",
+                "के सामने साफ़ था कि",
+            ],
+            r"भयानक सच्चाई का पता लगाता है": [
+                "रोंगटे खड़े कर देने वाले सच से पर्दा उठाता है",
+                "एक दिल दहला देने वाली हकीकत से रूबरू होता है",
+                "उस खौफ़नाक रहस्य की तह तक पहुँचता है",
+            ],
+        }
+        crutch_counters = {pat: 0 for pat in crutch_phrases}
+        for sc in scenes:
+            narr = sc.get("narration") or ""
+            if narr:
+                for pat, alts in crutch_phrases.items():
+                    if re.search(pat, narr):
+                        def make_sub(p, alt_list):
+                            def _sub(m):
+                                idx = crutch_counters[p]
+                                crutch_counters[p] += 1
+                                if idx == 0:
+                                    return m.group(0)
+                                return alt_list[(idx - 1) % len(alt_list)]
+                            return _sub
+                        narr = re.sub(pat, make_sub(pat, alts), narr)
+                sc["narration"] = narr
 
         return story

@@ -112,6 +112,14 @@
       "category_id": "horror_mystery",
       "video_path": "output/story_019/final/final_video.mp4",
       "youtube_url": "https://www.youtube.com/watch?v=baafGLI9cus"
+    },
+    {
+      "id": 15,
+      "category_id": "witch_ghost",
+      "topic": "चुड़ैल की वापसी: एक अनोखी साजिश",
+      "format_mode": "long",
+      "status": "generating",
+      "created_at": "2026-11-26T10:37:31.628442+00:00"
     }
   ]
 }

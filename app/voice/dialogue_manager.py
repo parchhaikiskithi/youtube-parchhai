@@ -104,23 +104,14 @@ class DialogueManager:
                 # If the narration already contains this dialogue line (the
                 # LLM often embeds quotes inside narration), playing the
                 # dialogue segment right after produces an audible echo.
-                # Skip the dialogue audio when the line appears verbatim (or
-                # nearly so) inside the narration text.
-                if narration and text in narration:
-                    logger.debug(
-                        "Scene %s dialogue %s skipped — already in narration", sn, i
+                # Only skip when the actual dialogue phrase appears verbatim inside narration.
+                norm_text = re.sub(r"[^\u0900-\u097F\w\s]", "", text).strip()
+                norm_narr = re.sub(r"[^\u0900-\u097F\w\s]", "", narration).strip()
+                if norm_text and len(norm_text) >= 10 and norm_text in norm_narr:
+                    logger.info(
+                        "Scene %s dialogue %s skipped — already spoken verbatim in narration", sn, i
                     )
                     continue
-                # Also skip when the dialogue is >70% of the narration by
-                # characters (catches paraphrased / minor-reword duplicates).
-                if narration:
-                    overlap = sum(1 for ch in text if ch in narration)
-                    if len(text) > 0 and overlap / len(text) > 0.70:
-                        logger.debug(
-                            "Scene %s dialogue %s skipped — %.0f%% overlap with narration",
-                            sn, i, overlap / len(text) * 100,
-                        )
-                        continue
                 # ────────────────────────────────────────────────────────────
 
                 gender = line.get("gender") or characters.get(name, {}).get("gender", "female")

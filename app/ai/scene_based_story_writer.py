@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from app.ai.providers import LLMRouter
+from app.ai.repetition_detector import RepetitionDetector
 from app.ai.story_blueprint_generator import StoryBlueprint
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class SceneBasedStoryWriter:
 
     def __init__(self, llm: LLMRouter | None = None) -> None:
         self.llm = llm or LLMRouter()
+        self.repetition_detector = RepetitionDetector()
 
     @staticmethod
     def build_system_prompt() -> str:
@@ -54,7 +56,9 @@ class SceneBasedStoryWriter:
             "D. DIALOGUE: Meaningful conversations that reveal clues, relationships, or conflict.\n"
             "E. REACTION: Realistic emotional and physical response.\n"
             "F. CONSEQUENCE: What changes because of this event?\n\n"
-            "### 3. ABSOLUTE BAN ON REPETITION:\n"
+            "### 3. ABSOLUTE BAN ON REPETITION & LEXICAL MONOTONY:\n"
+            "- NEVER repeat the same words or crutch phrases across consecutive sentences or scenes (e.g. 'को लगता है कि', 'खड़ा होता है', 'देखता है कि', 'अजीब', 'भयानक', 'सच्चाई').\n"
+            "- Use rich, varied Hindi vocabulary, evocative synonyms, and dynamic sentence structures.\n"
             "- NEVER repeat the same information using different words across scenes.\n"
             "- NEVER reuse questions like 'यह क्या है?', 'तुम कौन हो?', 'यह क्या हो रहा है?'.\n"
             "- Every paragraph must contribute at least ONE NEW THING: new clue, new action, new conflict, or new revelation.\n\n"
@@ -123,7 +127,7 @@ Return JSON in this exact structure:
             )
             data = self.llm.parse_json(resp.text)
             if data and data.get("scenes") and len(data["scenes"]) >= 4:
-                return data
+                return self.repetition_detector.deduplicate_story(data)
         except Exception as exc:
             logger.warning("LLM scene writing from blueprint failed (%s)", exc)
 

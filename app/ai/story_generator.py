@@ -242,7 +242,7 @@ class StoryGenerator:
 - Pronounce-friendly sentences for TTS
 - Include call_to_action field in Hindi
 - CRITICAL: narration must NOT repeat or quote the dialogue lines. Narration sets the scene context; dialogue speaks the character's exact words. Never put a character's spoken words inside the narration field — that causes double audio.
-- STRICT ANTI-REPETITION MANDATE: Every single scene MUST have unique, progressing narration (at least 3-5 sentences) and distinct character dialogue. NEVER repeat the same phrase, sentence, or dialogue across scenes.
+- STRICT ANTI-REPETITION & LEXICAL VARIETY MANDATE: Every single scene MUST have unique, progressing narration (at least 3-5 sentences) and distinct character dialogue. NEVER repeat the same phrase, sentence, or dialogue across scenes. NEVER repeat crutch words or repetitive phrases (such as 'को लगता है कि', 'खड़ा होता है', 'देखता है कि', 'अजीब', 'भयानक') across consecutive sentences. Use diverse Hindi vocabulary, varied sentence starters, and vivid descriptive synonyms.
 """
 
         prompt = f"""Write a completely original {req.genre} story for YouTube.
@@ -344,6 +344,9 @@ Schema:
             story = self._clean_and_deduplicate(story)
             audit_report = self.quality_auditor.audit(story)
 
+        # Final absolute guarantee: Zero-repetition pass on sentences, dialogues, and visual prompts
+        story = self.repetition_detector.deduplicate_story(story)
+
         story["quality_report"] = audit_report.to_dict()
         story["quality_score"] = audit_report.total_score
         story["human_review"] = audit_report.human_review_checklist
@@ -403,6 +406,17 @@ Schema:
         "सीढ़ियों के नीचे एक लाल बक्सा दबा हुआ है... उसमें किसी की पुरानी डायरी है।",
     ]
 
+    DIVERSE_ATMOSPHERIC_ENRICHMENTS = [
+        "चारों तरफ गहरा सन्नाटा पसरा हुआ था और दिल की धड़कनें साफ़ सुनाई दे रही थीं। हवा का हर झोंका किसी अनहोनी का इशारा दे रहा था।",
+        "कमरे में धूल और पुरानी लकड़ी की तीखी गंध हवा में तैर रही थी। दीवारों पर परछाइयां किसी साये की तरह डोल रही थीं।",
+        "सर्द हवा का एक तेज़ झोंका खिड़की से टकराया और दूर किसी कोने में पुरानी घड़ी की टिक-टिक गूंज उठी।",
+        "अंधेरे गलियारे में हर एक कदम के साथ फर्श के पुराने तख्ते अजीब तरह से चरमरा रहे थे।",
+        "सन्नाटे को चीरती हुई एक रहस्यमयी सरसराहट दीवार के पीछे से सुनाई दी, जिसने पूरे बदन में कंपकंपी दौड़ा दी।",
+        "कांपते हाथों से टॉर्च की रोशनी को आगे बढ़ाते हुए सांसें जैसे हलक में ही अटक कर रह गई थीं।",
+        "हर कोने में रहस्य का पहरा था और बंद दरवाजों के पीछे छिपे राज़ बाहर आने को बेताब लग रहे थे।",
+        "अचानक हवा में ठंडक और बढ़ गई, मानो कोई अदृश्य मौजूदगी ठीक उनके कंधे के पीछे आ खड़ी हुई हो।",
+    ]
+
     @staticmethod
     def clean_dialogue_line(raw_line: str, default_char: str = "पात्र") -> tuple[str, str, str]:
         """
@@ -419,11 +433,23 @@ Schema:
         match = re.match(r"^([\u0900-\u097F\w\s]{1,30}?)\s*(?:\(([^)]+)\))?\s*(?:[:：]|(?:\s+[-—]\s+)|—)\s*(.*)$", line)
         if match:
             char_match = match.group(1).strip()
-            if char_match and char_match not in ("Narrator", "सूत्रधार", "Voiceover"):
-                character = char_match
             if match.group(2):
                 emotion = match.group(2).strip()
             line = match.group(3).strip()
+
+            # Check if prefix is an in-story narrative speech clause (e.g. 'राघव ने कहा', 'उसने पूछा', 'उसने कहा')
+            speech_verbs = (
+                "ने कहा", "ने पूछा", "ने बोला", "ने बताया", "ने चिल्लाकर", "ने फुसफुसाकर",
+                "उसने कहा", "उसने पूछा", "उसने बोला", "कहते हुए", "कहता है", "कहती है"
+            )
+            if any(sv in char_match for sv in speech_verbs):
+                # Keep narrative speech clause in the spoken line so TTS reads it
+                clean_name = re.sub(r"\s*(?:ने\s*(?:कहा|पूछा|बोला|बताया|चिल्लाकर|फुसफुसाकर).*|उसने\s*(?:कहा|पूछा|बोला).*)$", "", char_match).strip()
+                character = clean_name or default_char
+                line = f"{char_match}, {line}"
+            else:
+                if char_match and char_match not in ("Narrator", "सूत्रधार", "Voiceover"):
+                    character = char_match
         else:
             emo_match = re.match(r"^\(([^)]+)\)\s*[:：\-]?\s*(.*)$", line)
             if emo_match:
@@ -463,24 +489,26 @@ Schema:
                 }
         story["character_references"] = list(ref_map.values())
 
+        pool_enrich_idx = 0
+        used_enrichments: set[str] = set()
+
         for sc in scenes:
             sn = sc.get("scene_number", 1)
             narr = (sc.get("narration") or "").strip()
             narr = re.sub(r"^(?:सूत्रधार|Narrator|वॉइसओवर|Voiceover)\s*[:：\-]\s*", "", narr).strip()
 
-            # Ensure minimum narration substance
+            # Ensure minimum narration substance without repeating identical static sentences
             if narr and len(narr) < 140:
-                mood = (sc.get("mood") or "suspense").lower()
-                if "suspense" in mood or "horror" in mood:
-                    narr += (
-                        " चारों तरफ गहरा सन्नाटा पसरा हुआ था और दिल की धड़कनें साफ़ सुनाई दे रही थीं। "
-                        "हवा का हर झोंका किसी अनहोनी का इशारा दे रहा था।"
-                    )
-                else:
-                    narr += (
-                        " माहौल में एक अजीब सी बेचैनी थी और हर गुज़रते पल के साथ "
-                        "सवालों की उलझन और भी गहरी होती जा रही थी।"
-                    )
+                enrichment = None
+                for candidate in self.DIVERSE_ATMOSPHERIC_ENRICHMENTS:
+                    if candidate not in used_enrichments:
+                        enrichment = candidate
+                        used_enrichments.add(candidate)
+                        break
+                if not enrichment:
+                    enrichment = self.DIVERSE_ATMOSPHERIC_ENRICHMENTS[pool_enrich_idx % len(self.DIVERSE_ATMOSPHERIC_ENRICHMENTS)]
+                    pool_enrich_idx += 1
+                narr += f" {enrichment}"
                 sc["narration"] = narr
 
             # Clean and deduplicate dialogue lines
@@ -522,6 +550,10 @@ Schema:
                 story["hook_opening"] = (scenes[0].get("narration") or "")[:200]
             if not story.get("ending"):
                 story["ending"] = (scenes[-1].get("narration") or "")[:200]
+
+        # Call repetition detector's deduplicate_story to eliminate duplicate sentences, repeated dialogues, and identical visual prompts
+        rep_detector = getattr(self, "repetition_detector", None) or RepetitionDetector()
+        story = rep_detector.deduplicate_story(story)
 
         return story
 
