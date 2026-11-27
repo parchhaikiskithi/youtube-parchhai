@@ -41,6 +41,12 @@ def cmd_generate(args: argparse.Namespace) -> None:
         topic_hint=getattr(args, "topic", None),
     )
     print(result)
+    if args.upload and result.get("upload_status") != "uploaded":
+        logging.error(
+            "Upload was requested but failed/deferred (status: %s). Exiting with error.",
+            result.get("upload_status"),
+        )
+        sys.exit(1)
 
 
 def cmd_test_ai() -> None:
